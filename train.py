@@ -30,6 +30,7 @@ def main():
     model = Autoencoder().to(device)
     criterion = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=5, verbose=True)
 
     for epoch in range(args.epochs):
         model.train()
@@ -51,6 +52,10 @@ def main():
 
                 running_loss += loss.item()
                 tepoch.set_postfix(loss=running_loss / (tepoch.n + 1))
+        
+        # Update the learning rate scheduler based on the epoch's average loss
+        epoch_loss = running_loss / 1000
+        scheduler.step(epoch_loss)
     
     print("Finished Training")
     torch.save(model.state_dict(), args.save_path)
