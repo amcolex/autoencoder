@@ -12,7 +12,7 @@ def generate_data(batch_size):
 def main():
     parser = argparse.ArgumentParser(description="Train the CNN autoencoder for OFDM.")
     parser.add_argument("--epochs", type=int, default=100, help="Number of training epochs.")
-    parser.add_argument("--batch-size", type=int, default=64, help="Batch size for training (smaller for larger models).")
+    parser.add_argument("--batch-size", type=int, default=512, help="Batch size for training. Increase to saturate GPU.")
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate.")
     parser.add_argument("--start-snr", type=float, default=20.0, help="Starting SNR in dB for curriculum learning.")
     parser.add_argument("--end-snr", type=float, default=0.0, help="Ending SNR in dB for curriculum learning.")
@@ -20,6 +20,9 @@ def main():
     args = parser.parse_args()
 
     if torch.cuda.is_available():
+        # Performance optimizations for NVIDIA GPUs
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
         device = torch.device("cuda")
     elif torch.backends.mps.is_available():
         device = torch.device("mps")
@@ -27,7 +30,7 @@ def main():
         device = torch.device("cpu")
     print(f"Using device: {device}")
 
-    model = Autoencoder().to(device)
+    model = torch.compile(Autoencoder().to(device))
     criterion = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=5)
