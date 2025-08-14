@@ -3,13 +3,13 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from autoencoder.models import Autoencoder
+from autoencoder.models import Autoencoder, NUM_MESSAGES
 from train import generate_data
 
-def calculate_ber(y_true, y_pred):
-    """Calculates the Bit Error Rate."""
-    y_pred_bits = (torch.sigmoid(y_pred) > 0.5).float()
-    return (y_true != y_pred_bits).float().mean().item()
+def calculate_ser(y_true, y_pred_logits):
+    """Calculates the Symbol Error Rate (SER)."""
+    y_pred = torch.argmax(y_pred_logits, dim=1)
+    return (y_true != y_pred).float().mean().item()
 
 def main():
     parser = argparse.ArgumentParser(description="Evaluate the autoencoder for OFDM.")
@@ -33,59 +33,53 @@ def main():
 
     # --- Plot Constellation ---
     with torch.no_grad():
-        # Generate a SINGLE 100-bit input vector
-        sample_bits = generate_data(1, 100).to(device)
-        
-        # Get the constellation points from the transmitter
-        constellation_points = model.transmitter(sample_bits)
+        # Generate all possible messages to see the full constellation
+        all_messages = torch.arange(0, NUM_MESSAGES, device=device)
+        constellation_points = model.transmitter(all_messages)
         constellation_points = model.normalization(constellation_points)
-        
-        # Move to CPU for plotting and reshape
         constellation = constellation_points.cpu().numpy().reshape(-1, 2)
         
         plt.figure(figsize=(8, 8))
-        plt.scatter(constellation[:, 0], constellation[:, 1], alpha=0.3)
-        plt.title('Learned Constellation Diagram')
+        plt.scatter(constellation[:, 0], constellation[:, 1])
+        plt.title(f'Learned Constellation Diagram ({NUM_MESSAGES} points)')
         plt.xlabel('I Component')
         plt.ylabel('Q Component')
         plt.grid(True)
         plt.axis('equal')
         plt.xlim(-1.5, 1.5)
         plt.ylim(-1.5, 1.5)
-        # Draw the unit circle for reference
         circle = plt.Circle((0, 0), 1, color='r', fill=False, linestyle='--')
         plt.gca().add_artist(circle)
         plt.savefig("constellation.png")
         print("Constellation plot saved to constellation.png")
 
-
-    # --- BER vs. SNR Evaluation ---
+    # --- SER vs. SNR Evaluation ---
     snr_range_db = np.arange(-10, 21, 2)
-    ber_values = []
+    ser_values = []
 
     with torch.no_grad():
-        for snr_db in tqdm(snr_range_db, desc="Evaluating BER vs. SNR"):
-            total_ber = 0
+        for snr_db in tqdm(snr_range_db, desc="Evaluating SER vs. SNR"):
+            total_ser = 0
             for _ in range(args.num_batches):
-                inputs = generate_data(args.batch_size, 100).to(device)
+                inputs = generate_data(args.batch_size).to(device)
                 snr_tensor = torch.full((args.batch_size, 1), float(snr_db), device=device)
                 
                 outputs = model(inputs, snr_tensor)
-                total_ber += calculate_ber(inputs, outputs)
+                total_ser += calculate_ser(inputs, outputs)
             
-            ber_values.append(total_ber / args.num_batches)
+            ser_values.append(total_ser / args.num_batches)
 
     plt.figure(figsize=(10, 6))
-    plt.plot(snr_range_db, ber_values, 'bo-', label='Autoencoder')
+    plt.plot(snr_range_db, ser_values, 'bo-', label='Autoencoder (SER)')
     plt.yscale('log')
     plt.xlabel('SNR (dB)')
-    plt.ylabel('Bit Error Rate (BER)')
-    plt.title('BER vs. SNR for the Autoencoder-based OFDM System')
+    plt.ylabel('Symbol Error Rate (SER)')
+    plt.title('SER vs. SNR for Message-based Autoencoder')
     plt.grid(True, which="both", ls="--")
     plt.legend()
     plt.ylim(1e-5, 1)
-    plt.savefig("ber_vs_snr.png")
-    print("Evaluation complete. Plot saved to ber_vs_snr.png")
+    plt.savefig("ser_vs_snr.png")
+    print("Evaluation complete. Plot saved to ser_vs_snr.png")
 
 if __name__ == "__main__":
     main()

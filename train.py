@@ -3,11 +3,11 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
-from autoencoder.models import Autoencoder
+from autoencoder.models import Autoencoder, NUM_MESSAGES
 
-def generate_data(batch_size, n_bits):
-    """Generates a batch of random bits."""
-    return torch.randint(0, 2, (batch_size, n_bits), dtype=torch.float32)
+def generate_data(batch_size):
+    """Generates a batch of random message indices."""
+    return torch.randint(0, NUM_MESSAGES, (batch_size,), dtype=torch.long)
 
 def main():
     parser = argparse.ArgumentParser(description="Train the autoencoder for OFDM.")
@@ -28,20 +28,19 @@ def main():
     print(f"Using device: {device}")
 
     model = Autoencoder().to(device)
-    criterion = nn.BCEWithLogitsLoss()
+    criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
     for epoch in range(args.epochs):
         model.train()
         running_loss = 0.0
         
-        # Curriculum learning: linearly decrease SNR from start_snr to end_snr
         current_snr = args.start_snr - (args.start_snr - args.end_snr) * (epoch / (args.epochs -1))
 
-        with tqdm(range(1000), unit="batch") as tepoch: # 1000 batches per epoch
+        with tqdm(range(1000), unit="batch") as tepoch:
             tepoch.set_description(f"Epoch {epoch+1}/{args.epochs} (SNR: {current_snr:.2f} dB)")
             for _ in tepoch:
-                inputs = generate_data(args.batch_size, 100).to(device)
+                inputs = generate_data(args.batch_size).to(device)
                 snr_db = torch.full((args.batch_size, 1), current_snr, device=device)
 
                 optimizer.zero_grad()
