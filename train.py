@@ -3,20 +3,20 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
-from autoencoder.models import Autoencoder, NUM_MESSAGES
+from autoencoder.models import Autoencoder, INPUT_BITS
 
 def generate_data(batch_size):
-    """Generates a batch of random message indices."""
-    return torch.randint(0, NUM_MESSAGES, (batch_size,), dtype=torch.long)
+    """Generates a batch of random bits."""
+    return torch.randint(0, 2, (batch_size, INPUT_BITS), dtype=torch.float32)
 
 def main():
-    parser = argparse.ArgumentParser(description="Train the autoencoder for OFDM.")
+    parser = argparse.ArgumentParser(description="Train the CNN autoencoder for OFDM.")
     parser.add_argument("--epochs", type=int, default=100, help="Number of training epochs.")
-    parser.add_argument("--batch-size", type=int, default=128, help="Batch size for training.")
+    parser.add_argument("--batch-size", type=int, default=64, help="Batch size for training (smaller for larger models).")
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate.")
     parser.add_argument("--start-snr", type=float, default=20.0, help="Starting SNR in dB for curriculum learning.")
     parser.add_argument("--end-snr", type=float, default=0.0, help="Ending SNR in dB for curriculum learning.")
-    parser.add_argument("--save-path", type=str, default="autoencoder.pth", help="Path to save the trained model.")
+    parser.add_argument("--save-path", type=str, default="autoencoder_cnn.pth", help="Path to save the trained model.")
     args = parser.parse_args()
 
     if torch.cuda.is_available():
@@ -28,7 +28,7 @@ def main():
     print(f"Using device: {device}")
 
     model = Autoencoder().to(device)
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
     for epoch in range(args.epochs):
