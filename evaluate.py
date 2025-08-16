@@ -1,9 +1,9 @@
-import argparse
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from autoencoder.models import Autoencoder, INPUT_BITS
+from autoencoder.models import Autoencoder
+from autoencoder import config
 from train import generate_data
 
 def calculate_ber(y_true, y_pred_logits):
@@ -12,11 +12,6 @@ def calculate_ber(y_true, y_pred_logits):
     return (y_true != y_pred_bits).float().mean().item()
 
 def main():
-    parser = argparse.ArgumentParser(description="Evaluate the CNN autoencoder for OFDM.")
-    parser.add_argument("--model-path", type=str, default="autoencoder_cnn.pth", help="Path to the trained CNN model.")
-    parser.add_argument("--batch-size", type=int, default=1000, help="Batch size for evaluation.")
-    parser.add_argument("--num-batches", type=int, default=100, help="Number of batches to test per SNR point.")
-    args = parser.parse_args()
 
     if torch.cuda.is_available():
         device = torch.device("cuda")
@@ -27,7 +22,7 @@ def main():
     print(f"Using device: {device}")
 
     model = Autoencoder()
-    model.load_state_dict(torch.load(args.model_path))
+    model.load_state_dict(torch.load(config.MODEL_SAVE_PATH))
     model = model.to(device)
     model.eval()
 
@@ -49,8 +44,8 @@ def main():
         plt.ylim(-1.5, 1.5)
         circle = plt.Circle((0, 0), 1, color='r', fill=False, linestyle='--')
         plt.gca().add_artist(circle)
-        plt.savefig("constellation_cnn.png")
-        print("Constellation plot for one block saved to constellation_cnn.png")
+        plt.savefig(config.CONSTELLATION_SAVE_PATH)
+        print(f"Constellation plot for one block saved to {config.CONSTELLATION_SAVE_PATH}")
 
     # --- BER vs. SNR Evaluation ---
     snr_range_db = np.arange(-5, 16, 1) # More granular SNR range
@@ -59,14 +54,14 @@ def main():
     with torch.no_grad():
         for snr_db in tqdm(snr_range_db, desc="Evaluating BER vs. SNR"):
             total_ber = 0
-            for _ in range(args.num_batches):
-                inputs = generate_data(args.batch_size).to(device)
-                snr_tensor = torch.full((args.batch_size, 1), float(snr_db), device=device)
+            for _ in range(config.NUM_BATCHES):
+                inputs = generate_data(config.EVAL_BATCH_SIZE).to(device)
+                snr_tensor = torch.full((config.EVAL_BATCH_SIZE, 1), float(snr_db), device=device)
                 
                 outputs = model(inputs, snr_tensor)
                 total_ber += calculate_ber(inputs, outputs)
             
-            ber_values.append(total_ber / args.num_batches)
+            ber_values.append(total_ber / config.NUM_BATCHES)
 
     plt.figure(figsize=(10, 6))
     plt.plot(snr_range_db, ber_values, 'bo-', label='CNN Autoencoder (BER)')
@@ -77,8 +72,8 @@ def main():
     plt.grid(True, which="both", ls="--")
     plt.legend()
     plt.ylim(1e-6, 1)
-    plt.savefig("ber_vs_snr_cnn.png")
-    print("Evaluation complete. Plot saved to ber_vs_snr_cnn.png")
+    plt.savefig(config.BER_SAVE_PATH)
+    print(f"Evaluation complete. Plot saved to {config.BER_SAVE_PATH}")
 
 if __name__ == "__main__":
     main()

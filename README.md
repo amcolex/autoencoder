@@ -31,21 +31,25 @@ The entire system is trained end-to-end to minimize the binary cross-entropy bet
    uv pip install -e .
    ```
 
+### Configuration
+
+All settings for the model, training, and evaluation are centralized in `autoencoder/config.py`. You can modify this file to change parameters like the number of epochs, learning rate, SNR range, and model save paths.
+
 ### Training
 
 To train the autoencoder, run the `train.py` script:
 ```bash
-python train.py --epochs 100 --snr 10
+python train.py
 ```
-This will train the model for 100 epochs at an SNR of 10 dB and save the trained model to `autoencoder.pth`.
+This will train the model using the settings in `autoencoder/config.py` and save the trained model to the path specified in the configuration.
 
 ### Evaluation
 
 To evaluate the trained model and generate a BER vs. SNR plot, run the `evaluate.py` script:
 ```bash
-python evaluate.py --model-path autoencoder.pth
+python evaluate.py
 ```
-This will run the evaluation and save the plot to `ber_vs_snr.png`.
+This will run the evaluation using the trained model and save the resulting plots to the paths defined in the configuration.
 
 ## Results
 

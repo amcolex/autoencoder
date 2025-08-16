@@ -1,10 +1,7 @@
 import torch
 import torch.nn as nn
 from .layers import Normalization, AWGN
-
-# --- Model Configuration ---
-INPUT_BITS = 1024
-N_CHANNEL = 1024
+from . import config
 
 class Transmitter(nn.Module):
     """
@@ -50,7 +47,7 @@ class Receiver(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = x.view(x.shape[0], 2, N_CHANNEL)
+        x = x.view(x.shape[0], 2, config.N_CHANNEL)
         x = self.decoder(x)
         return x.squeeze(1)
 
@@ -62,7 +59,7 @@ class Autoencoder(nn.Module):
     def __init__(self):
         super().__init__()
         self.transmitter = Transmitter()
-        self.normalization = Normalization(N_CHANNEL)
+        self.normalization = Normalization(config.N_CHANNEL)
         self.channel = AWGN()
         self.receiver = Receiver()
 
