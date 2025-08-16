@@ -21,9 +21,8 @@ def main():
         device = torch.device("cpu")
     print(f"Using device: {device}")
 
-    model = Autoencoder()
-    model.load_state_dict(torch.load(config.MODEL_SAVE_PATH))
-    model = model.to(device)
+    model = torch.compile(Autoencoder().to(device))
+    model.load_state_dict(torch.load(config.MODEL_SAVE_PATH, map_location=device))
     model.eval()
 
     # --- Plot Constellation for one block ---
