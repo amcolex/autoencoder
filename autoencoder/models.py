@@ -4,8 +4,8 @@ from .layers import Normalization, AWGN
 
 # --- Model Configuration ---
 # We now use a block-based approach with 1D CNNs.
-INPUT_BITS = 1024
-N_CHANNEL = 1024
+INPUT_BITS = 1000
+N_CHANNEL = 1000
 
 class Transmitter(nn.Module):
     """

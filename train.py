@@ -19,6 +19,13 @@ def calculate_ber(y_true, y_pred_logits):
     y_pred_bits = (torch.sigmoid(y_pred_logits) > 0.5).float()
     return (y_true != y_pred_bits).float().mean().item()
 
+def calculate_bler(y_true, y_pred_logits):
+    """Calculates the Block Error Rate (BLER)."""
+    y_pred_bits = (torch.sigmoid(y_pred_logits) > 0.5).float()
+    # A block has an error if any bit is incorrect
+    block_errors = torch.any(y_true != y_pred_bits, dim=1)
+    return block_errors.float().mean().item()
+
 def plot_constellation(model, device, sample_bits, path):
     """Plots the constellation diagram for a given model and data."""
     model.eval()
@@ -41,31 +48,36 @@ def plot_constellation(model, device, sample_bits, path):
         plt.savefig(path)
         plt.close()
 
-def plot_ber_vs_snr(model, device, path, num_batches, batch_size):
-    """Plots the BER vs. SNR curve."""
+def plot_performance_curves(model, device, path, num_batches, batch_size):
+    """Plots the BER and BLER vs. SNR curves."""
     model.eval()
-    snr_range_db = np.arange(-5, 16, 1)
+    snr_range_db = np.arange(-5, 30, 1)
     ber_values = []
+    bler_values = []
 
     with torch.no_grad():
-        for snr_db in snr_range_db:
+        for snr_db in tqdm(snr_range_db, desc="BER/BLER Evaluation"):
             total_ber = 0
+            total_bler = 0
             for _ in range(num_batches):
                 inputs = generate_data(batch_size).to(device)
                 snr_tensor = torch.full((batch_size, 1), float(snr_db), device=device)
                 outputs = model(inputs, snr_tensor)
                 total_ber += calculate_ber(inputs, outputs)
+                total_bler += calculate_bler(inputs, outputs)
             ber_values.append(total_ber / num_batches)
+            bler_values.append(total_bler / num_batches)
 
     plt.figure(figsize=(10, 6))
-    plt.plot(snr_range_db, ber_values, 'bo-', label='CNN Autoencoder (BER)')
+    plt.plot(snr_range_db, ber_values, 'bo-', label='BER')
+    plt.plot(snr_range_db, bler_values, 'gs-', label='BLER')
     plt.yscale('log')
     plt.xlabel('SNR (dB)')
-    plt.ylabel('Bit Error Rate (BER)')
-    plt.title('BER vs. SNR')
+    plt.ylabel('Error Rate')
+    plt.title('Performance vs. SNR')
     plt.grid(True, which="both", ls="--")
     plt.legend()
-    plt.ylim(1e-6, 1)
+    plt.ylim(1e-6, 1.5)
     plt.savefig(path)
     plt.close()
 
@@ -124,7 +136,7 @@ def main():
         plot_constellation(model, device, constellation_sample, constellation_path)
 
         ber_plot_path = os.path.join(run_dir, f"ber_vs_snr_epoch_{epoch+1}.png")
-        plot_ber_vs_snr(model, device, ber_plot_path, num_batches=config.EVAL_NUM_BATCHES, batch_size=config.EVAL_BATCH_SIZE)
+        plot_performance_curves(model, device, ber_plot_path, num_batches=config.EVAL_NUM_BATCHES, batch_size=config.EVAL_BATCH_SIZE)
 
         print(f"Epoch {epoch+1} finished. Checkpoint and plots saved.")
 
